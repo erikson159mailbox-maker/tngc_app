@@ -2898,106 +2898,6 @@
       showToast(`已生成「${hostA} & ${hostB}」交誼廳口語對談腳本 ✨`);
     }
 
-    // App 內建免安裝語音試聽引擎 (依所選聲線自動區分音色與語速＋咖啡廳襯樂)
-    let isAuditioningInApp = false;
-    function synthesizeAndAuditionInApp() {
-      const btn = document.getElementById('btnSynthesizeInApp');
-      if (isAuditioningInApp) {
-        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-        isAuditioningInApp = false;
-        if (btn) btn.innerText = '🔊 2. App內直接試聽人聲';
-        showToast('已停止試聽');
-        return;
-      }
-
-      const rawLines = document.getElementById('adminGeneratedScriptOutput').innerText
-        .split('\n')
-        .map(l => l.trim())
-        .filter(l => l.includes('：「'));
-
-      if (rawLines.length === 0) {
-        showToast('請先生成口語腳本');
-        return;
-      }
-
-      if (!('speechSynthesis' in window)) {
-        showToast('此瀏覽器不支援內建語音試聽');
-        return;
-      }
-
-      window.speechSynthesis.cancel();
-      isAuditioningInApp = true;
-      if (btn) btn.innerText = '⏹️ 停止試聽';
-
-      const voiceAInfo = (document.getElementById('adminVoiceASelect')?.value || 'zh-TW-YunJheNeural|陳哥|male_warm').split('|');
-      const voiceBInfo = (document.getElementById('adminVoiceBSelect')?.value || 'zh-TW-HsiaoChenNeural|小恩|female_friendly').split('|');
-      showToast(`正在試聽：${voiceAInfo[1]} & ${voiceBInfo[1]} 雙人對談...`);
-
-      // 啟動柔和背景襯樂
-      if (!isPlaying) startAmbientSound();
-
-      const voices = window.speechSynthesis.getVoices().filter(v => v.lang.includes('zh-TW') || v.lang.includes('zh'));
-      let idx = 0;
-
-      const applyVoicePreset = (utter, presetType) => {
-        if (presetType === 'male_warm') {
-          if (voices.length >= 2) utter.voice = voices[voices.length - 1];
-          utter.pitch = 0.86;
-          utter.rate = 0.95;
-        } else if (presetType === 'male_young') {
-          if (voices.length >= 2) utter.voice = voices[voices.length - 1];
-          utter.pitch = 1.02;
-          utter.rate = 1.04;
-        } else if (presetType === 'female_soft') {
-          if (voices.length >= 1) utter.voice = voices[0];
-          utter.pitch = 1.05;
-          utter.rate = 0.96;
-        } else {
-          if (voices.length >= 1) utter.voice = voices[0];
-          utter.pitch = 1.14;
-          utter.rate = 1.03;
-        }
-      };
-
-      const speakNextLine = () => {
-        if (!isAuditioningInApp || idx >= rawLines.length) {
-          isAuditioningInApp = false;
-          if (btn) btn.innerText = '🔊 2. App內直接試聽人聲';
-          if (!isPlaying) stopAmbientSound();
-          return;
-        }
-        const line = rawLines[idx];
-        const isHostA = line.startsWith(voiceAInfo[1]);
-        const cleanText = line.replace(/^[^：]+：「/, '').replace(/」$/, '');
-
-        const utter = new SpeechSynthesisUtterance(cleanText);
-        utter.lang = 'zh-TW';
-        applyVoicePreset(utter, isHostA ? voiceAInfo[2] : voiceBInfo[2]);
-
-        utter.onend = () => {
-          idx++;
-          setTimeout(speakNextLine, 320); // 換人說話的自然停頓
-        };
-        utter.onerror = () => {
-          idx++;
-          speakNextLine();
-        };
-        window.speechSynthesis.speak(utter);
-      };
-
-      speakNextLine();
-    }
-
-    function publishAdminEpisodeToRadio() {
-      const scriptText = document.getElementById('adminGeneratedScriptOutput').innerText.trim();
-      const rawTopic = document.getElementById('adminRawSermonInput').value.trim().slice(0, 16) || '最新主日輕鬆聊';
-      const hostA = (document.getElementById('adminVoiceASelect')?.value || '').split('|')[1] || '陳哥';
-      const hostB = (document.getElementById('adminVoiceBSelect')?.value || '').split('|')[1] || '小恩';
-      const firstTwoLines = scriptText.split('\n').slice(0, 2).join('｜');
-
-      CAPSULES.unshift({
-        id: Date.now(),
-        cat: '10min',
     // App 內建語音試聽引擎 (優先播放 GitHub Edge-TTS 自動合成之真實台灣自然人聲 MP3)
     let isAuditioningInApp = false;
     function synthesizeAndAuditionInApp() {
@@ -3067,6 +2967,32 @@
         };
         speakNextLine();
       });
+    }
+
+    function publishAdminEpisodeToRadio() {
+      const scriptText = document.getElementById('adminGeneratedScriptOutput').innerText.trim();
+      const rawTopic = document.getElementById('adminRawSermonInput').value.trim().slice(0, 16) || '最新主日輕鬆聊';
+      const hostA = (document.getElementById('adminVoiceASelect')?.value || '').split('|')[1] || '陳哥';
+      const hostB = (document.getElementById('adminVoiceBSelect')?.value || '').split('|')[1] || '小恩';
+      const firstTwoLines = scriptText.split('\n').slice(0, 2).join('｜');
+
+      CAPSULES.unshift({
+        id: Date.now(),
+        cat: '10min',
+        badge: '最新上架',
+        tag: '同工新發布',
+        title: rawTopic,
+        desc: `最新雙人自然口語對談節目（${hostA} & ${hostB}）`,
+        durationSec: 600,
+        meta: `10 分鐘微讀對談・${hostA} & ${hostB}`,
+        audioUrl: './audio/mp3/ep_01.mp3',
+        script: firstTwoLines || scriptText
+      });
+
+      closeRadioAdminModal();
+      renderCapsuleList();
+      syncLiveRadioTimeline();
+      showToast(`已上架「${rawTopic}」至隨選主題與 24H 輪播 ✓`);
     }
 
     function selectFamilyMember(idx, smooth = true) {
