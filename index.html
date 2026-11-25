@@ -2924,75 +2924,147 @@
       realAudioPlayer.play().then(() => {
         showToast('正在播放 GitHub Edge-TTS 台灣自然人聲 MP3 🎙️');
       }).catch(() => {
-        // 若目前在離線預覽環境尚未連接 GitHub MP3，則提示並啟用瀏覽器預覽
+        // 若目前在離線預覽環境尚未連接 GitHub MP3，則使用瀏覽器語音備援試聽
         const rawLines = document.getElementById('adminGeneratedScriptOutput').innerText
           .split('\n')
           .map(l => l.trim())
-          .filter(l => l.includes('：「'));
+          .filter(Boolean);
 
-        if (rawLines.length === 0 || !('speechSynthesis' in window)) {
+        if (!('speechSynthesis' in window) || rawLines.length === 0) {
           isAuditioningInApp = false;
           if (btn) btn.innerText = '🔊 2. App內直接試聽人聲';
-          showToast('請上傳至 GitHub Pages 以播放 Edge-TTS 真實自然人聲 MP3');
+          showToast('尚未偵測到線上 MP3（請確認 GitHub Actions 已產生 ep_01.mp3）');
           return;
         }
 
         window.speechSynthesis.cancel();
-        showToast('目前為預覽模式（上傳 GitHub 後將自動播放真實 Edge-TTS 人聲）');
-        if (!isPlaying) startAmbientSound();
-
-        const voices = window.speechSynthesis.getVoices().filter(v => v.lang.includes('zh-TW') || v.lang.includes('zh'));
-        const voiceAInfo = (document.getElementById('adminVoiceASelect')?.value || 'zh-TW-YunJheNeural|陳哥|male_warm').split('|');
-        const voiceBInfo = (document.getElementById('adminVoiceBSelect')?.value || 'zh-TW-HsiaoChenNeural|小恩|female_friendly').split('|');
+        const hostA = (document.getElementById('adminVoiceASelect')?.value || '').split('|')[1] || '陳哥';
         let idx = 0;
 
-        const speakNextLine = () => {
+        const speakNext = () => {
           if (!isAuditioningInApp || idx >= rawLines.length) {
             isAuditioningInApp = false;
             if (btn) btn.innerText = '🔊 2. App內直接試聽人聲';
-            if (!isPlaying) stopAmbientSound();
             return;
           }
-          const line = rawLines[idx];
-          const isHostA = line.startsWith(voiceAInfo[1]);
-          const cleanText = line.replace(/^[^：]+：「/, '').replace(/」$/, '');
-          const utter = new SpeechSynthesisUtterance(cleanText);
+          const line = rawLines[idx++];
+          const parts = line.split('：');
+          const speaker = parts[0] || '';
+          const content = (parts.slice(1).join('：') || line).replace(/[「」]/g, '');
+          const utter = new SpeechSynthesisUtterance(content);
           utter.lang = 'zh-TW';
-          if (voices.length >= 2) utter.voice = isHostA ? voices[voices.length - 1] : voices[0];
-          utter.pitch = isHostA ? 0.88 : 1.1;
-          utter.rate = isHostA ? 0.96 : 1.02;
-          utter.onend = () => { idx++; setTimeout(speakNextLine, 320); };
-          utter.onerror = () => { idx++; speakNextLine(); };
+          utter.pitch = speaker.includes(hostA) ? 0.88 : 1.12;
+          utter.rate = speaker.includes(hostA) ? 0.96 : 1.02;
+          utter.onend = () => setTimeout(speakNext, 260);
+          utter.onerror = () => {
+            isAuditioningInApp = false;
+            if (btn) btn.innerText = '🔊 2. App內直接試聽人聲';
+          };
           window.speechSynthesis.speak(utter);
         };
-        speakNextLine();
+
+        showToast('離線預覽備援試聽中（放上 GitHub 將播真實 Edge-TTS 人聲）');
+        speakNext();
       });
     }
 
     function publishAdminEpisodeToRadio() {
       const scriptText = document.getElementById('adminGeneratedScriptOutput').innerText.trim();
-      const rawTopic = document.getElementById('adminRawSermonInput').value.trim().slice(0, 16) || '最新主日輕鬆聊';
+      if (!scriptText) {
+        showToast('請先生成口語對談腳本');
+        return;
+      }
       const hostA = (document.getElementById('adminVoiceASelect')?.value || '').split('|')[1] || '陳哥';
       const hostB = (document.getElementById('adminVoiceBSelect')?.value || '').split('|')[1] || '小恩';
-      const firstTwoLines = scriptText.split('\n').slice(0, 2).join('｜');
+      const rawTopic = document.getElementById('adminRawSermonInput').value.trim().slice(0, 18) || '最新主日輕鬆聊';
+      const newEpNum = CAPSULES.length + 1;
+      const newId = Date.now();
 
       CAPSULES.unshift({
-        id: Date.now(),
+        id: newId,
         cat: '10min',
         badge: '最新上架',
-        tag: '同工新發布',
-        title: rawTopic,
-        desc: `最新雙人自然口語對談節目（${hostA} & ${hostB}）`,
+        tag: '同工新製節目',
+        title: `新恩輕鬆聊：${rawTopic}`,
+        desc: `由 ${hostA} & ${hostB} 帶來的最新口語信息對談。`,
         durationSec: 600,
         meta: `10 分鐘微讀對談・${hostA} & ${hostB}`,
-        audioUrl: './audio/mp3/ep_01.mp3',
-        script: firstTwoLines || scriptText
+        audioUrl: `./audio/mp3/ep_${String(newEpNum).padStart(2, '0')}.mp3`,
+        script: scriptText.replace(/\n/g, '｜')
       });
 
       closeRadioAdminModal();
       renderCapsuleList();
       syncLiveRadioTimeline();
-      showToast(`已上架「${rawTopic}」至隨選主題與 24H 輪播 ✓`);
+      showToast('已上架至「隨選主題」與「24H 輪播」🚀');
+    }
+
+    // 9. 家庭 QR Code 報到卡 (左右滑動卡片 ＋ 兩側箭頭)
+    const familyMembers = [
+      { name: '林弟兄', role: '戶長・成人主日', group: '以馬內利小組', code: 'TNGC-2026-0101', color: '#5C6B54' },
+      { name: '陳姊妹', role: '配偶・敬拜服事', group: '以馬內利小組', code: 'TNGC-2026-0102', color: '#8B6F4E' },
+      { name: '林小恩', role: '兒童主日學・中高年級', group: '約書亞班 (205教室)', code: 'TNGC-2026-0103', color: '#D4A359' },
+      { name: '林小美', role: '兒童主日學・幼年級', group: '大衛班 (206教室)', code: 'TNGC-2026-0104', color: '#6E8898' }
+    ];
+    let currentFamilyIdx = 0;
+
+    function buildQrSvg(seedText, accentColor) {
+      let hash = 0;
+      for (let i = 0; i < seedText.length; i++) {
+        hash = ((hash << 5) - hash) + seedText.charCodeAt(i);
+        hash |= 0;
+      }
+      const size = 9;
+      let rects = '';
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          const isCorner = (r < 3 && c < 3) || (r < 3 && c >= size - 3) || (r >= size - 3 && c < 3);
+          const bit = isCorner || (((Math.abs(hash + r * 17 + c * 31) % 5) < 2));
+          if (bit) {
+            rects += `<rect x="${12 + c * 10}" y="${12 + r * 10}" width="8.5" height="8.5" rx="1.8" fill="${isCorner ? accentColor : '#3A352F'}"/>`;
+          }
+        }
+      }
+      return `<svg viewBox="0 0 114 114" class="w-36 h-36 mx-auto bg-white p-2 rounded-2xl border border-sanctuary-border shadow-inner">${rects}</svg>`;
+    }
+
+    function renderQrCarousel() {
+      const carousel = document.getElementById('qrCarousel');
+      if (!carousel) return;
+      carousel.innerHTML = familyMembers.map(m => `
+        <div class="w-full shrink-0 snap-center p-5 text-center space-y-2.5">
+          <div class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-sanctuary-sand dark:bg-sanctuary-darkCard text-xs font-medium text-sanctuary-text dark:text-sanctuary-darkText">
+            <span>${escapeHtml(m.name)}</span>
+            <span class="text-sanctuary-muted">・${escapeHtml(m.role)}</span>
+          </div>
+          ${buildQrSvg(m.code, m.color)}
+          <div class="space-y-0.5">
+            <p class="font-mono text-xs font-bold tracking-wider text-sanctuary-text dark:text-sanctuary-darkText">${m.code}</p>
+            <p class="text-[11px] text-sanctuary-muted dark:text-sanctuary-darkMuted">${escapeHtml(m.group)}｜請對準報到機掃描</p>
+          </div>
+        </div>
+      `).join('');
+      updateFamilyTabsUI();
+    }
+
+    function updateFamilyTabsUI() {
+      document.querySelectorAll('.fam-tab').forEach((btn, idx) => {
+        if (idx === currentFamilyIdx) {
+          btn.className = 'fam-tab px-3 py-1.5 rounded-full text-xs font-medium bg-sanctuary-olive text-white shrink-0';
+        } else {
+          btn.className = 'fam-tab px-3 py-1.5 rounded-full text-xs font-medium bg-sanctuary-sand dark:bg-sanctuary-darkBg text-sanctuary-muted shrink-0';
+        }
+      });
+    }
+
+    function openQrModal() {
+      renderQrCarousel();
+      document.getElementById('qrModal').classList.remove('hidden');
+      setTimeout(() => selectFamilyMember(currentFamilyIdx, false), 20);
+    }
+
+    function closeQrModal() {
+      document.getElementById('qrModal').classList.add('hidden');
     }
 
     function selectFamilyMember(idx, smooth = true) {
