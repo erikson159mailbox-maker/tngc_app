@@ -1044,6 +1044,25 @@
             <span class="text-[10px] px-2 py-0.5 rounded-full bg-sanctuary-oliveLight dark:bg-emerald-950/60 text-sanctuary-olive dark:text-emerald-300 font-medium">免裝程式・App內建</span>
           </div>
           <textarea id="adminRawSermonInput" rows="2" placeholder="貼上主日信息、週報公告或見證重點..." class="w-full bg-sanctuary-card dark:bg-sanctuary-darkCard border border-sanctuary-border dark:border-sanctuary-darkBorder rounded-xl p-2 text-xs resize-none focus:outline-none">摩西求神親自同去；「為神做事」不等於「與神同行」，過程中的被調整才是關鍵。</textarea>
+          <!-- 人聲聲線選擇器 -->
+          <div class="grid grid-cols-2 gap-1.5">
+            <div class="bg-sanctuary-card dark:bg-sanctuary-darkCard border border-sanctuary-border dark:border-sanctuary-darkBorder rounded-xl px-2.5 py-1">
+              <label class="block text-[10px] text-sanctuary-muted">主持人 A 聲線</label>
+              <select id="adminVoiceASelect" class="w-full bg-transparent text-[11px] font-medium text-sanctuary-text dark:text-sanctuary-darkText focus:outline-none">
+                <option value="zh-TW-YunJheNeural|陳哥|male_warm">雲哲（台灣溫暖男聲）</option>
+                <option value="zh-CN-YunxiNeural|阿哲|male_young">雲希（陽光青年男聲）</option>
+                <option value="zh-TW-HsiaoYuNeural|雅婷|female_soft">曉雨（台灣知性女聲）</option>
+              </select>
+            </div>
+            <div class="bg-sanctuary-card dark:bg-sanctuary-darkCard border border-sanctuary-border dark:border-sanctuary-darkBorder rounded-xl px-2.5 py-1">
+              <label class="block text-[10px] text-sanctuary-muted">主持人 B 聲線</label>
+              <select id="adminVoiceBSelect" class="w-full bg-transparent text-[11px] font-medium text-sanctuary-text dark:text-sanctuary-darkText focus:outline-none">
+                <option value="zh-TW-HsiaoChenNeural|小恩|female_friendly">曉臻（台灣親切女聲）</option>
+                <option value="zh-TW-HsiaoYuNeural|曉雨|female_soft">曉雨（台灣柔和知性女聲）</option>
+                <option value="zh-TW-YunJheNeural|陳哥|male_warm">雲哲（台灣溫暖男聲）</option>
+              </select>
+            </div>
+          </div>
           <div class="grid grid-cols-2 gap-1.5">
             <button type="button" onclick="generateNaturalDialogueScript()" class="py-1.5 px-2.5 rounded-full bg-sanctuary-wood text-white text-xs font-medium hover:opacity-90 active:scale-95 transition">✨ 1. 生成自然口語腳本</button>
             <button type="button" id="btnSynthesizeInApp" onclick="synthesizeAndAuditionInApp()" class="py-1.5 px-2.5 rounded-full bg-sanctuary-olive text-white text-xs font-medium hover:opacity-90 active:scale-95 transition">🔊 2. App內直接試聽人聲</button>
@@ -2870,14 +2889,16 @@
     function generateNaturalDialogueScript() {
       const raw = document.getElementById('adminRawSermonInput').value.trim() || '本週主日信息提醒我們在忙碌中與神同行。';
       const out = document.getElementById('adminGeneratedScriptOutput');
+      const hostA = (document.getElementById('adminVoiceASelect')?.value || '').split('|')[1] || '陳哥';
+      const hostB = (document.getElementById('adminVoiceBSelect')?.value || '').split('|')[1] || '小恩';
       out.innerText =
-        `陳哥：「欸小恩，今天這段『${raw.slice(0, 24)}…』其實滿戳中我們平常在教會的狀態對吧？」\n` +
-        `小恩：「老實講喔，真的！有時候忙著把事情做完，反而忘記先安靜下來問神的心意。」\n` +
-        `陳哥：「哈哈哈沒錯，所以每天留三分鐘深呼吸禱告，把主權交還給神，心裡真的會踏實很多！」`;
-      showToast('已生成「去 AI 味」交誼廳口語對談腳本 ✨');
+        `${hostA}：「欸${hostB}，今天這段『${raw.slice(0, 24)}…』其實滿戳中我們平常在教會的狀態對吧？」\n` +
+        `${hostB}：「老實講喔，真的！有時候忙著把事情做完，反而忘記先安靜下來問神的心意。」\n` +
+        `${hostA}：「哈哈哈沒錯，所以每天留三分鐘深呼吸禱告，把主權交還給神，心裡真的會踏實很多！」`;
+      showToast(`已生成「${hostA} & ${hostB}」交誼廳口語對談腳本 ✨`);
     }
 
-    // App 內建免安裝語音試聽引擎 (自動區分陳哥男聲與小恩女聲輪流朗讀＋咖啡廳襯樂)
+    // App 內建免安裝語音試聽引擎 (依所選聲線自動區分音色與語速＋咖啡廳襯樂)
     let isAuditioningInApp = false;
     function synthesizeAndAuditionInApp() {
       const btn = document.getElementById('btnSynthesizeInApp');
@@ -2907,13 +2928,36 @@
       window.speechSynthesis.cancel();
       isAuditioningInApp = true;
       if (btn) btn.innerText = '⏹️ 停止試聽';
-      showToast('正在 App 內模擬「陳哥 & 小恩」雙人對談試聽...');
+
+      const voiceAInfo = (document.getElementById('adminVoiceASelect')?.value || 'zh-TW-YunJheNeural|陳哥|male_warm').split('|');
+      const voiceBInfo = (document.getElementById('adminVoiceBSelect')?.value || 'zh-TW-HsiaoChenNeural|小恩|female_friendly').split('|');
+      showToast(`正在試聽：${voiceAInfo[1]} & ${voiceBInfo[1]} 雙人對談...`);
 
       // 啟動柔和背景襯樂
       if (!isPlaying) startAmbientSound();
 
       const voices = window.speechSynthesis.getVoices().filter(v => v.lang.includes('zh-TW') || v.lang.includes('zh'));
       let idx = 0;
+
+      const applyVoicePreset = (utter, presetType) => {
+        if (presetType === 'male_warm') {
+          if (voices.length >= 2) utter.voice = voices[voices.length - 1];
+          utter.pitch = 0.86;
+          utter.rate = 0.95;
+        } else if (presetType === 'male_young') {
+          if (voices.length >= 2) utter.voice = voices[voices.length - 1];
+          utter.pitch = 1.02;
+          utter.rate = 1.04;
+        } else if (presetType === 'female_soft') {
+          if (voices.length >= 1) utter.voice = voices[0];
+          utter.pitch = 1.05;
+          utter.rate = 0.96;
+        } else {
+          if (voices.length >= 1) utter.voice = voices[0];
+          utter.pitch = 1.14;
+          utter.rate = 1.03;
+        }
+      };
 
       const speakNextLine = () => {
         if (!isAuditioningInApp || idx >= rawLines.length) {
@@ -2923,19 +2967,12 @@
           return;
         }
         const line = rawLines[idx];
-        const isChen = line.startsWith('陳哥');
+        const isHostA = line.startsWith(voiceAInfo[1]);
         const cleanText = line.replace(/^[^：]+：「/, '').replace(/」$/, '');
 
         const utter = new SpeechSynthesisUtterance(cleanText);
         utter.lang = 'zh-TW';
-        // 區分男聲(低沉穩重)與女聲(清亮親切)
-        if (voices.length >= 2) {
-          utter.voice = isChen ? voices[voices.length - 1] : voices[0];
-        } else if (voices.length === 1) {
-          utter.voice = voices[0];
-        }
-        utter.pitch = isChen ? 0.88 : 1.12;
-        utter.rate = isChen ? 0.96 : 1.03;
+        applyVoicePreset(utter, isHostA ? voiceAInfo[2] : voiceBInfo[2]);
 
         utter.onend = () => {
           idx++;
@@ -2954,79 +2991,81 @@
     function publishAdminEpisodeToRadio() {
       const scriptText = document.getElementById('adminGeneratedScriptOutput').innerText.trim();
       const rawTopic = document.getElementById('adminRawSermonInput').value.trim().slice(0, 16) || '最新主日輕鬆聊';
+      const hostA = (document.getElementById('adminVoiceASelect')?.value || '').split('|')[1] || '陳哥';
+      const hostB = (document.getElementById('adminVoiceBSelect')?.value || '').split('|')[1] || '小恩';
       const firstTwoLines = scriptText.split('\n').slice(0, 2).join('｜');
 
       CAPSULES.unshift({
         id: Date.now(),
         cat: '10min',
-        badge: '最新上架',
-        tag: '同工後台發布',
-        title: `新恩輕鬆聊：${rawTopic}`,
-        desc: '10 分鐘交誼廳口語對談，陪你在日常生活中重新對齊神的心意。',
-        durationSec: 600,
-        meta: '10 分鐘微讀對談・陳哥 & 小恩',
-        script: firstTwoLines
-      });
+    // App 內建語音試聽引擎 (優先播放 GitHub Edge-TTS 自動合成之真實台灣自然人聲 MP3)
+    let isAuditioningInApp = false;
+    function synthesizeAndAuditionInApp() {
+      const btn = document.getElementById('btnSynthesizeInApp');
+      if (isAuditioningInApp) {
+        realAudioPlayer.pause();
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        isAuditioningInApp = false;
+        if (btn) btn.innerText = '🔊 2. App內直接試聽人聲';
+        showToast('已停止試聽');
+        return;
+      }
 
-      closeRadioAdminModal();
-      switchTab('radio');
-      switchRadioMode('capsules');
-      showToast('已直接上架至「隨選主題」與「24H 輪播」🚀');
-    }
+      isAuditioningInApp = true;
+      if (btn) btn.innerText = '⏹️ 停止試聽';
 
-    // 9. 家庭 QR Code 報到卡 (左右滑動卡片 ＋ 兩側箭頭)
-    const familyMembers = [
-      { name: '林弟兄', role: '成人主日崇拜', code: 'TNG-2026-0841-A' },
-      { name: '陳姊妹', role: '成人主日崇拜', code: 'TNG-2026-0841-B' },
-      { name: '林小恩', role: '兒童主日學', code: 'TNG-2026-0841-C' },
-      { name: '林小美', role: '兒童主日學', code: 'TNG-2026-0841-D' }
-    ];
-    let currentFamilyIdx = 0;
+      // 優先嘗試播放 GitHub Actions 產出的 Edge-TTS 真實自然人聲 MP3
+      realAudioPlayer.src = './audio/mp3/ep_01.mp3';
+      realAudioPlayer.onended = () => {
+        isAuditioningInApp = false;
+        if (btn) btn.innerText = '🔊 2. App內直接試聽人聲';
+      };
 
-    function openQrModal() {
-      renderQrCarousel();
-      document.getElementById('qrModal').classList.remove('hidden');
-      setTimeout(() => selectFamilyMember(currentFamilyIdx, false), 15);
-    }
-    function closeQrModal() {
-      document.getElementById('qrModal').classList.add('hidden');
-    }
+      realAudioPlayer.play().then(() => {
+        showToast('正在播放 GitHub Edge-TTS 台灣自然人聲 MP3 🎙️');
+      }).catch(() => {
+        // 若目前在離線預覽環境尚未連接 GitHub MP3，則提示並啟用瀏覽器預覽
+        const rawLines = document.getElementById('adminGeneratedScriptOutput').innerText
+          .split('\n')
+          .map(l => l.trim())
+          .filter(l => l.includes('：「'));
 
-    function renderQrCarousel() {
-      const carousel = document.getElementById('qrCarousel');
-      if (!carousel) return;
-      carousel.innerHTML = familyMembers.map((m, idx) => `
-        <div class="w-full shrink-0 snap-center p-5 flex flex-col items-center justify-center space-y-3">
-          <div class="flex items-center gap-2">
-            <span class="px-2.5 py-0.5 rounded-full bg-sanctuary-oliveLight dark:bg-sanctuary-darkCard text-sanctuary-olive dark:text-sanctuary-amber text-xs font-medium">${m.role}</span>
-            <h4 class="font-serif text-base font-bold">${m.name}</h4>
-          </div>
-          <div class="w-40 h-40 p-3 rounded-2xl border-4 border-sanctuary-text dark:border-sanctuary-darkText flex items-center justify-center relative bg-white">
-            <svg viewBox="0 0 100 100" class="w-full h-full text-sanctuary-text">
-              <rect x="5" y="5" width="25" height="25" fill="none" stroke="currentColor" stroke-width="5"/>
-              <rect x="12" y="12" width="11" height="11" fill="currentColor"/>
-              <rect x="70" y="5" width="25" height="25" fill="none" stroke="currentColor" stroke-width="5"/>
-              <rect x="77" y="12" width="11" height="11" fill="currentColor"/>
-              <rect x="5" y="70" width="25" height="25" fill="none" stroke="currentColor" stroke-width="5"/>
-              <rect x="12" y="77" width="11" height="11" fill="currentColor"/>
-              <path d="M40 10h10v10H40zM55 20h10v15H55zM38 40h24v20H38zM10 42h15v12H10zM72 45h18v10H72zM42 70h12v20H42zM68 68h22v22H68z" fill="currentColor" opacity="${0.85 - idx * 0.05}"/>
-            </svg>
-            <div class="absolute inset-0 flex items-center justify-center">
-              <span class="px-2 py-0.5 rounded-md bg-white text-sanctuary-olive font-serif font-bold text-xs shadow-sm border border-sanctuary-border">恩</span>
-            </div>
-          </div>
-          <p class="font-mono text-xs text-sanctuary-muted tracking-wider">${m.code}</p>
-        </div>
-      `).join('');
-    }
-
-    function updateFamilyTabsUI() {
-      document.querySelectorAll('.fam-tab').forEach((btn, i) => {
-        if (i === currentFamilyIdx) {
-          btn.className = 'fam-tab px-3 py-1.5 rounded-full text-xs font-medium bg-sanctuary-olive text-white shrink-0';
-        } else {
-          btn.className = 'fam-tab px-3 py-1.5 rounded-full text-xs font-medium bg-sanctuary-sand dark:bg-sanctuary-darkBg text-sanctuary-muted shrink-0';
+        if (rawLines.length === 0 || !('speechSynthesis' in window)) {
+          isAuditioningInApp = false;
+          if (btn) btn.innerText = '🔊 2. App內直接試聽人聲';
+          showToast('請上傳至 GitHub Pages 以播放 Edge-TTS 真實自然人聲 MP3');
+          return;
         }
+
+        window.speechSynthesis.cancel();
+        showToast('目前為預覽模式（上傳 GitHub 後將自動播放真實 Edge-TTS 人聲）');
+        if (!isPlaying) startAmbientSound();
+
+        const voices = window.speechSynthesis.getVoices().filter(v => v.lang.includes('zh-TW') || v.lang.includes('zh'));
+        const voiceAInfo = (document.getElementById('adminVoiceASelect')?.value || 'zh-TW-YunJheNeural|陳哥|male_warm').split('|');
+        const voiceBInfo = (document.getElementById('adminVoiceBSelect')?.value || 'zh-TW-HsiaoChenNeural|小恩|female_friendly').split('|');
+        let idx = 0;
+
+        const speakNextLine = () => {
+          if (!isAuditioningInApp || idx >= rawLines.length) {
+            isAuditioningInApp = false;
+            if (btn) btn.innerText = '🔊 2. App內直接試聽人聲';
+            if (!isPlaying) stopAmbientSound();
+            return;
+          }
+          const line = rawLines[idx];
+          const isHostA = line.startsWith(voiceAInfo[1]);
+          const cleanText = line.replace(/^[^：]+：「/, '').replace(/」$/, '');
+          const utter = new SpeechSynthesisUtterance(cleanText);
+          utter.lang = 'zh-TW';
+          if (voices.length >= 2) utter.voice = isHostA ? voices[voices.length - 1] : voices[0];
+          utter.pitch = isHostA ? 0.88 : 1.1;
+          utter.rate = isHostA ? 0.96 : 1.02;
+          utter.onend = () => { idx++; setTimeout(speakNextLine, 320); };
+          utter.onerror = () => { idx++; speakNextLine(); };
+          window.speechSynthesis.speak(utter);
+        };
+        speakNextLine();
       });
     }
 
